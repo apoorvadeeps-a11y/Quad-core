@@ -1,0 +1,109 @@
+/* OneStep Dynamic Highlight Styles for Real Webpages */
+
+.onestep-highlight-target {
+  outline: 3.5px solid #7656A7 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(118, 86, 167, 0.25), 0 0 20px rgba(118, 86, 167, 0.5) !important;
+  animation: onestep-pulse 1.8s infinite ease-in-out !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  z-index: 999998 !important;
+}
+
+@keyframes onestep-pulse {
+  0% {
+    box-shadow: 0 0 0 3px rgba(118, 86, 167, 0.4), 0 0 10px rgba(118, 86, 167, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(118, 86, 167, 0.15), 0 0 24px rgba(118, 86, 167, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(118, 86, 167, 0.4), 0 0 10px rgba(118, 86, 167, 0.3);
+  }
+}
+
+/* Floating Tooltip */
+.onestep-tooltip {
+  position: absolute !important;
+  z-index: 999999 !important;
+  background: #1E1B18 !important;
+  color: #FFFDF9 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  animation: onestep-bounce 0.4s ease-out !important;
+  white-space: nowrap !important;
+  max-width: 420px !important;
+}
+
+.onestep-tooltip::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 100% !important;
+  left: 20px !important;
+  border-width: 6px !important;
+  border-style: solid !important;
+  border-color: #1E1B18 transparent transparent transparent !important;
+}
+
+@keyframes onestep-bounce {
+  0% { transform: translateY(-8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.onestep-badge {
+  background: #7656A7 !important;
+  color: #FFFFFF !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  letter-spacing: 0.5px !important;
+  flex-shrink: 0 !important;
+}
+
+.onestep-instruction-text {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 200px !important;
+  color: #FFFDF9 !important;
+}
+
+.onestep-action-pill {
+  background: #7656A7 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+}
+
+.onestep-action-pill:hover {
+  background: #8e6bca !important;
+}
+
+.onestep-close-pill {
+  background: transparent !important;
+  color: #A0988E !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  padding: 2px 4px !important;
+  line-height: 1 !important;
+}
+
+.onestep-close-pill:hover {
+  color: #FFFDF9 !important;
+}

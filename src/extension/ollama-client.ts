@@ -8,7 +8,7 @@ import {
 
 export const DEFAULT_OLLAMA_CONFIG: OllamaConfig = {
   baseUrl: 'http://localhost:11434',
-  modelTag: 'qwen2.5:7b',
+  modelTag: 'qwen2.5:0.5b',
   timeoutMs: 30000,
   temperature: 0.1,
 };

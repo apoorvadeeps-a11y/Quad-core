@@ -1,0 +1,122 @@
+import sys
+from pathlib import Path
+from typing import Set
+
+# Ensure backend directory is in sys.path for direct imports
+backend_dir = Path(__file__).resolve().parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from models import HealthResponse, NextStepRequest, NextResponse
+from ai_service import get_ai_next_step
+
+app = FastAPI(
+    title="OneStep API",
+    description="Backend API connecting the OneStep frontend navigation assistant to the AI service.",
+    version="1.0.0",
+)
+
+# Enable CORS for frontend web apps, localhost dev servers, and browser extensions
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Catch Pydantic validation errors and return clear HTTP 400 Bad Request responses.
+    """
+    error_messages = []
+    clean_errors = []
+    for err in exc.errors():
+        loc_parts = [str(part) for part in err.get("loc", []) if part != "body"]
+        loc = " -> ".join(loc_parts)
+        msg = err.get("msg", "Invalid value")
+        if loc:
+            error_messages.append(f"{loc}: {msg}")
+        else:
+            error_messages.append(msg)
+
+        clean_errors.append({
+            "field": loc if loc else "body",
+            "message": msg,
+            "type": err.get("type", "validation_error"),
+        })
+
+    detail_msg = "; ".join(error_messages) if error_messages else "Invalid request body"
+
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": detail_msg,
+            "errors": clean_errors,
+        },
+    )
+
+
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
+async def health():
+    """
+    Check if the API server is operational.
+    """
+    return HealthResponse(status="ok")
+
+
+@app.post(
+    "/next-step",
+    response_model=NextResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Navigation"],
+)
+async def next_step(payload: NextStepRequest):
+    """
+    Process page interactive elements and user goal to identify the next navigation step.
+    """
+    # Request is validated by Pydantic (non-empty goal and non-empty elements)
+    valid_ids: Set[str] = {el.id for el in payload.elements}
+
+    try:
+        response = await get_ai_next_step(
+            goal=payload.goal,
+            page=payload.page,
+            elements=payload.elements,
+        )
+
+        # Enforce rule: returned element_id must exist in the request if not null/None
+        returned_id = getattr(response, "element_id", None) if not isinstance(response, dict) else response.get("element_id")
+        if returned_id is not None and returned_id not in valid_ids:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"AI service returned element_id '{returned_id}' which does not exist in the request elements list.",
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI evaluation failed: {str(exc)}",
+        )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

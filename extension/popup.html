@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneStep AI Navigation</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <div class="logo-icon">✨</div>
+        <div>
+          <div class="title-row">
+            <span class="title">OneStep</span>
+            <span class="version-badge">Universal</span>
+          </div>
+          <p class="subtitle">AI Navigation for Any Website</p>
+        </div>
+      </div>
+      <div id="backendStatus" class="status-badge status-checking">
+        <span class="status-dot"></span>
+        <span id="statusText">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Dynamic Webpage Context Card -->
+    <div class="context-card">
+      <div class="context-header">
+        <div class="site-identity">
+          <span id="siteDomain" class="domain-tag">Active Site</span>
+        </div>
+        <span id="elementCount" class="element-badge">0 elements</span>
+      </div>
+      <div id="pageTitle" class="page-title">Detecting page...</div>
+      <div id="pageMeta" class="page-meta hidden"></div>
+    </div>
+
+    <!-- Goal Input Area -->
+    <div class="input-card">
+      <div class="input-header-row">
+        <label for="goalInput" class="input-label">What is your goal on this site?</label>
+        <button id="clearGoalBtn" class="text-btn" title="Clear input">Clear</button>
+      </div>
+      <input
+        type="text"
+        id="goalInput"
+        placeholder="e.g. Find pricing, Sign in, Search products, Settings..."
+        autocomplete="off"
+      />
+
+      <!-- Dynamic Suggestion Chips (populated based on current page) -->
+      <div class="chips-label">SUGGESTED ACTIONS</div>
+      <div id="chipContainer" class="chip-container">
+        <!-- Rendered dynamically by popup.js -->
+      </div>
+
+      <button id="findStepBtn" class="primary-btn">
+        <span>Find Next Step</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </div>
+
+    <!-- Result Recommendation Card -->
+    <div id="resultCard" class="result-card hidden">
+      <div class="result-header">
+        <span class="result-tag">RECOMMENDED NEXT STEP</span>
+        <span id="targetIdBadge" class="target-badge">el_1</span>
+      </div>
+      <div id="instructionText" class="instruction-text">Click Citizen Services</div>
+      <div id="reasonText" class="reason-text">Citizen Services contains settings to update your address.</div>
+
+      <!-- Action Buttons -->
+      <div class="action-row">
+        <button id="highlightBtn" class="action-btn secondary" title="Scroll & glow element on page">
+          <span>✨ Highlight</span>
+        </button>
+        <button id="clickBtn" class="action-btn primary" title="Perform click action on page">
+          <span>⚡ Click For Me</span>
+        </button>
+      </div>
+      <div class="card-footer-row">
+        <button id="clearHighlightBtn" class="subtle-link-btn">Clear page highlight</button>
+      </div>
+    </div>
+
+    <!-- Error / Status Note -->
+    <div id="errorMessage" class="error-banner hidden"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-row">
+        <span>Connected to local AI model (<a href="http://localhost:8000/docs" target="_blank">Ollama Qwen</a>)</span>
+        <button id="refreshPageBtn" class="icon-refresh-btn" title="Re-scan webpage">🔄</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
