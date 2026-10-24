@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "OneStep — Cross-Website AI Navigation Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered browser navigation assistant that helps users complete tasks across any website using local Qwen 2.5 via Ollama.",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "OneStep Assistant"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  }
+}

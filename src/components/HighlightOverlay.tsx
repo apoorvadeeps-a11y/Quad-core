@@ -37,7 +37,16 @@ export const HighlightOverlay: React.FC<HighlightOverlayProps> = ({
       return;
     }
 
-    const targetEl = portalContainerRef.current.querySelector<HTMLElement>(`[data-onestep-id="${targetId}"]`);
+    let targetEl: HTMLElement | null = null;
+    try {
+      targetEl = portalContainerRef.current.querySelector<HTMLElement>(
+        `[data-onestep-eid="${targetId}"], [data-onestep-id="${targetId}"], #${CSS.escape(targetId)}`
+      );
+    } catch {
+      targetEl = portalContainerRef.current.querySelector<HTMLElement>(
+        `[data-onestep-eid="${targetId}"], [data-onestep-id="${targetId}"]`
+      );
+    }
     if (!targetEl) {
       setRect(null);
       return;

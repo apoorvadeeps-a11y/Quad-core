@@ -1,117 +1,90 @@
-# OneStep — AI Browser Navigation Assistant
+# OneStep — Cross-Website AI Navigation Assistant (Chrome Extension)
 
-> **Frontend Prototype:** This repository currently implements the complete, interactive frontend user experience and UI prototype for **OneStep**. The backend service, Ollama integration, and Qwen model pipeline will be developed separately by the backend team.
-
----
-
-## 1. What is OneStep?
-
-**OneStep** is an AI-powered browser navigation assistant that sits alongside any webpage in a side-by-side workspace (similar to an AI coding assistant beside a code editor). It helps users accomplish multi-step web tasks without frustration.
-
-### Key Capabilities
-- **Desktop Side-by-Side Workspace**: Default 70% webpage / 30% assistant layout with quick presets (`70:30`, `60:40`, `80:20`), draggable divider, and persistent size memory stored in `localStorage`.
-- **Mode 1 — Guide Me (Human in the Loop)**:
-  - Highlights target buttons or links directly on the webpage with glowing, non-blocking 3px outlines and floating tooltips.
-  - Automatically selects high-contrast highlight colors (`Violet`, `Terracotta`, `Cyan`, `Amber`) by inspecting the target element's background color in real time.
-  - Provides "Show me", "I'm stuck", and expandable "Why this step?" explanations.
-  - Detects **wrong turns** (e.g. clicking Library instead of Finance) and displays an instant recovery card to guide the user back.
-- **Mode 2 — Do It For Me (Autonomous Agent)**:
-  - Simulates an AI agent automatically performing steps with realistic timing and activity logs.
-  - Allows the user to pause, resume, change playback speed (`1x` vs `2x`), or stop.
-  - **Review Before Continuing Gate**: For sensitive or high-impact actions (such as downloading financial records or submitting forms), the agent automatically pauses and presents an approval screen detailing completed actions, pending actions, and safety impact notes before proceeding.
-- **Mock University Student Portal**:
-  - Full-featured mock portal (Apex State University) including Dashboard, Academic Records, Attendance, and Finance ledger with Semester 5 Fee receipts.
-  - Supports downloadable simulated PDF vouchers.
+OneStep is an AI-powered browser navigation assistant built as a **Manifest V3 Chrome Extension**. It helps users accomplish multi-step workflows across diverse websites using a locally hosted **Qwen 2.5** model via Ollama running on another laptop on your trusted Wi-Fi network.
 
 ---
 
-## 2. High-Level Architecture
+## 1. Architecture Overview
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                        OneStep                         │
-├───────────────────────────┬────────────────────────────┤
-│         Frontend          │       Future Backend       │
-│  (Implemented Prototype)  │      (Planned / Spec)      │
-├───────────────────────────┼────────────────────────────┤
-│ • React 19 + TypeScript   │ • FastAPI Application      │
-│ • Vite + Tailwind CSS     │ • Local Ollama Runtime     │
-│ • Adaptive Highlighting   │ • Qwen-2.5-VL Reasoning    │
-│ • Draggable Resizable UI  │ • CDP Browser Automation   │
-│ • LocalStorage Sync       │ • Multi-tenant sessions    │
-└───────────────────────────┴────────────────────────────┘
+OneStep UI (Side Panel / Popup)
+  │
+  ▼
+Extension Service Worker (service-worker.js)
+  │
+  ├─────────────────────────────────────────────────┐
+  │                                                 │
+  ▼                                                 ▼
+Ollama API (/api/chat, Qwen 2.5 on LAN)       Active Tab Content Script (content-script.js)
+  │                                                 │
+  ▼                                                 ▼
+Structured JSON Plan                          Live Webpage DOM Extraction & Highlights
 ```
+
+- **OneStep UI**: Preserves the warm, elegant OneStep interface (ivory `#F7F3EC`, violet `#7656A7`, sage green `#4A7C59`, dark charcoal `#2B2825`), featuring Guide Me, Do It For Me, Review Before Continuing, and Form Autofill cards.
+- **Extension Service Worker**: Background coordinator querying Ollama from the extension security realm without cross-origin webpage restrictions.
+- **Content Script & DOM Extractor**: Captures privacy-filtered snapshots with temporary IDs (`e1`, `e2`...), renders adaptive glowing outlines and tooltips, and executes actions.
+- **Ollama Client**: Queries Qwen 2.5 using strict JSON schema prompting (`format: "json"`), action allowlists, and error recovery.
 
 ---
 
-## 3. Repository Structure
+## 2. Key Capabilities
 
-```
-onestep/
-├── README.md                # Project documentation and quickstart
-├── .gitignore               # Git ignore rules
-├── index.html               # Main HTML entry point
-├── package.json             # App dependencies & run scripts
-├── vite.config.ts           # Vite configuration
-├── src/                     # Frontend implementation
-│   ├── App.tsx              # App orchestrator & layout state
-│   ├── main.tsx             # React bootstrap
-│   ├── index.css            # Tailwind CSS design tokens & animations
-│   ├── types/               # TypeScript models & workflows
-│   ├── data/                # Mock workflows & university portal data
-│   ├── utils/               # Contrast inspection engine
-│   └── components/
-│       ├── BrowserHeader.tsx         # Address bar & layout presets
-│       ├── ResizableDivider.tsx      # Draggable divider
-│       ├── HighlightOverlay.tsx      # Adaptive glowing target overlay
-│       ├── ReceiptModal.tsx          # Downloaded PDF preview
-│       ├── mock-portal/              # University portal pages & sidebar
-│       └── onestep-panel/            # Assistant panel, modes & cards
-├── backend/                 # Reserved for backend team
-│   ├── README.md            # Backend instructions (handled by backend team)
-│   ├── app/                 # Placeholder for future backend services
-│   └── tests/               # Placeholder for backend test suites
-└── docs/
-    └── ARCHITECTURE.md      # Detailed system architecture document
-```
+1. **Cross-Website Operation**:
+   - Works on arbitrary websites without site-specific hardcoding.
+   - Dual-demo workspace included:
+     - **Site 1**: Apex State University Student Portal
+     - **Site 2**: GovDirect Citizen Registry & Certificate Application
+2. **Local Qwen 2.5 via Ollama**:
+   - Configurable host IP (e.g. `http://192.168.1.105:11434`) and model tag (`qwen2.5:7b`, `qwen2.5:3b`, `qwen2.5-coder:7b`).
+   - One-click connection test checking `/api/tags` on the remote laptop.
+3. **Adaptive Contrast Highlighting**:
+   - 3px glowing outline + floating direction tooltip.
+   - Inspects target background color and selects from predefined contrasting palette (`Violet`, `Terracotta`, `Cyan`, `Amber`).
+4. **Form Autofill with Review Gate**:
+   - Detects form controls (`text`, `email`, `tel`, `date`, `textarea`, `select`, `checkbox`, `radio`).
+   - Proposes mappings from user profile for review before filling.
+   - Never submits forms automatically.
+5. **Safety & User Control**:
+   - Sensitive actions (downloads, submissions) require explicit confirmation.
+   - Visible stop and pause controls at all times.
+   - Automatic re-indexing on navigation to prevent stale element errors.
 
 ---
 
-## 4. Getting Started (Frontend Prototype)
+## 3. Quick Start (Web Preview & Chrome Extension)
 
-### Prerequisites
-- Node.js (v18 or higher recommended)
-- npm or yarn
-
-### Installation & Run
-
+### Run in Local Preview Mode
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Run the Vite development server
 npm run dev
 ```
+Open `http://localhost:3000` to interact with OneStep and both test websites in a side-by-side workspace.
 
-The application will be live at `http://localhost:3000`.
+### Build and Load as Chrome Extension
+```bash
+npm run build
+```
+1. Open Google Chrome and go to `chrome://extensions`.
+2. Toggle on **Developer mode** (top-right).
+3. Click **Load unpacked** (top-left) and select the `dist/` folder.
+4. Pin **OneStep** in your Chrome toolbar.
 
-### Trying Out OneStep
+---
 
-1. **Enter a Goal**: Use the prefilled suggestion *"Download my university fee receipt"* or pick one from the suggestions list.
-2. **Test Guide Me Mode**:
-   - Notice the glowing outline and tooltip on **Finance** in the left sidebar.
-   - Click **Finance**. The next element (**Fee Payments**) is highlighted.
-   - Click **Fee Payments**, then click **Payment History**.
-   - Notice the button **Download Receipt** is highlighted. Click it to complete the task and view the verified fee voucher!
-3. **Test Wrong Turn Recovery**:
-   - In Guide Me mode, try clicking **Library** or **Attendance** on the sidebar instead of Finance.
-   - OneStep detects that you're on a different page and shows the *Wrong Turn* card. Click *"Find the right path"* to recover.
-4. **Test Do It For Me Mode**:
-   - Return to Home, choose **Do It For Me**, and hit Start.
-   - Watch the agent navigate through the portal with live timeline updates.
-   - Observe how the agent automatically stops before downloading to display the **Review Before Continuing** safety gate.
-   - Click *"Approve & Continue"* to finish the workflow.
-5. **Test Layout Resizing**:
-   - Click the preset buttons in the browser bar (`70:30`, `60:40`, `80:20`).
-   - Drag the divider handle between the mock website and the assistant.
-   - Refresh the page to verify your custom split ratio is preserved.
+## 4. Ollama Configuration on the Second Laptop
+
+1. On the AI laptop, find your Wi-Fi IP address:
+   - Windows: `ipconfig`
+   - macOS / Linux: `ifconfig` or `ip addr`
+2. Launch Ollama listening on all network interfaces:
+   ```bash
+   OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS="*" ollama serve
+   ```
+3. Pull Qwen 2.5:
+   ```bash
+   ollama pull qwen2.5:7b
+   ```
+4. In OneStep, click the **Settings Gear** and enter `http://<IP>:11434`. Click **Test Connection**.
+
+For complete instructions and troubleshooting, see [docs/CHROME_EXTENSION_GUIDE.md](docs/CHROME_EXTENSION_GUIDE.md).
