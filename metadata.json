@@ -1,0 +1,6 @@
+{
+  "name": "OneStep - AI Browser Navigation Assistant",
+  "description": "AI-powered browser navigation assistant that sits beside a webpage and helps users complete tasks step by step in Guide Me or Do It For Me mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
