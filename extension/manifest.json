@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "OneStep — AI Web Navigation Assistant",
-  "version": "1.0.0",
-  "description": "AI-guided browser navigation assistant that connects real webpages to your local FastAPI backend.",
+  "version": "1.0.1",
+  "description": "AI-guided browser navigation assistant that connects real webpages to your local Qwen model backend.",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "http://localhost:8000/*",
@@ -21,7 +22,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "run_at": "document_idle"
     }
   ]
 }

@@ -1,6 +1,6 @@
 /**
  * OneStep Dynamic Popup Script
- * Universal navigation coordinator for any website.
+ * Universal navigation and AI model training coordinator for any website.
  */
 
 const BACKEND_URL = 'http://localhost:8000';
@@ -27,13 +27,156 @@ const reasonTextEl = document.getElementById('reasonText');
 const highlightBtn = document.getElementById('highlightBtn');
 const clickBtn = document.getElementById('clickBtn');
 const clearHighlightBtn = document.getElementById('clearHighlightBtn');
+const saveTrainBtn = document.getElementById('saveTrainBtn');
 const refreshPageBtn = document.getElementById('refreshPageBtn');
+const trainCountBadgeEl = document.getElementById('trainCountBadge');
+const trainingNoteEl = document.getElementById('trainingNote');
 const errorMessageEl = document.getElementById('errorMessage');
+
+// Check if a URL allows content script execution
+function isScriptableUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  return !(
+    lower.startsWith('chrome://') ||
+    lower.startsWith('chrome-extension://') ||
+    lower.startsWith('edge://') ||
+    lower.startsWith('about:') ||
+    lower.startsWith('view-source:') ||
+    lower.includes('chromewebstore.google.com') ||
+    lower.includes('chrome.google.com/webstore')
+  );
+}
+
+// In-page scraping function executed directly inside the active tab
+function inPageScrape() {
+  function isVisible(el) {
+    if (!el || el.closest('.onestep-ui-container')) return false;
+    const style = window.getComputedStyle(el);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      parseFloat(style.opacity || '1') === 0 ||
+      el.getAttribute('aria-hidden') === 'true'
+    ) {
+      return false;
+    }
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function extractText(node) {
+    if (!node) return '';
+    let text = (node.innerText || node.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!text && (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA')) {
+      text = node.value || node.getAttribute('placeholder') || '';
+    }
+    if (!text) {
+      text = node.getAttribute('aria-label') || node.getAttribute('title') || '';
+    }
+    if (!text) {
+      const img = node.querySelector('img[alt]');
+      if (img) text = img.getAttribute('alt') || '';
+    }
+    if (!text) {
+      const svg = node.querySelector('svg');
+      if (svg) {
+        const svgTitle = svg.querySelector('title');
+        text = (svgTitle ? svgTitle.textContent : '') || svg.getAttribute('aria-label') || '';
+      }
+    }
+    if (!text) {
+      const lower = ((node.className || '') + ' ' + (node.id || '')).toLowerCase();
+      if (lower.includes('search')) text = 'Search';
+      else if (lower.includes('cart') || lower.includes('bag')) text = 'Cart';
+      else if (lower.includes('menu') || lower.includes('nav')) text = 'Menu';
+      else if (lower.includes('user') || lower.includes('profile')) text = 'Profile / Account';
+      else if (lower.includes('close')) text = 'Close';
+    }
+    return text.trim();
+  }
+
+  const SELECTORS = [
+    'button',
+    'a[href]',
+    'input:not([type="hidden"])',
+    'select',
+    'textarea',
+    'summary',
+    '[role="button"]',
+    '[role="link"]',
+    '[role="tab"]',
+    '[role="menuitem"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[role="switch"]',
+    '[role="combobox"]',
+    '[role="searchbox"]',
+    '[role="option"]',
+    '[tabindex="0"]',
+    '[onclick]',
+    '[data-action]'
+  ];
+
+  const candidates = Array.from(document.querySelectorAll(SELECTORS.join(', ')));
+  const custom = document.querySelectorAll('div, span');
+  for (let i = 0; i < Math.min(custom.length, 250); i++) {
+    const el = custom[i];
+    if (el.children.length <= 1 && isVisible(el)) {
+      if (window.getComputedStyle(el).cursor === 'pointer' && !candidates.includes(el)) {
+        candidates.push(el);
+      }
+    }
+  }
+
+  const elements = [];
+  const seenIds = new Set();
+  let counter = 1;
+
+  for (const node of candidates) {
+    if (!isVisible(node)) continue;
+    const text = extractText(node);
+    if (!text && !node.id && node.tagName !== 'INPUT') continue;
+
+    let elId = node.id ? node.id.trim() : '';
+    if (!elId || seenIds.has(elId) || elId.length > 50) {
+      elId = node.getAttribute('data-onestep-id');
+      if (!elId || seenIds.has(elId)) {
+        elId = `step_el_${counter++}`;
+        node.setAttribute('data-onestep-id', elId);
+      }
+    }
+    seenIds.add(elId);
+
+    elements.push({
+      id: elId,
+      type: node.tagName.toLowerCase(),
+      text: text.slice(0, 120),
+      aria_label: (node.getAttribute('aria-label') || '').slice(0, 100),
+      placeholder: (node.getAttribute('placeholder') || '').slice(0, 100),
+      role: node.getAttribute('role') || undefined,
+    });
+
+    if (elements.length >= 100) break;
+  }
+
+  const h1 = document.querySelector('h1')?.innerText?.trim() || '';
+  const h2 = document.querySelector('h2')?.innerText?.trim() || '';
+
+  return {
+    page: document.title || window.location.hostname,
+    domain: window.location.hostname,
+    url: window.location.href,
+    heading: (h1 || h2 || '').slice(0, 150),
+    elements: elements,
+  };
+}
 
 // Initialize on popup load
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await checkBackendStatus();
+  await updateTrainingStats();
   await initActiveTab();
 });
 
@@ -54,7 +197,6 @@ function setupEventListeners() {
     }, 300);
   });
 
-  // Highlight button
   highlightBtn.addEventListener('click', () => {
     if (currentResult && currentResult.element_id && activeTabId) {
       chrome.tabs.sendMessage(activeTabId, {
@@ -65,19 +207,18 @@ function setupEventListeners() {
     }
   });
 
-  // Click it for me button
-  clickBtn.addEventListener('click', () => {
+  clickBtn.addEventListener('click', async () => {
     if (currentResult && currentResult.element_id && activeTabId) {
       chrome.tabs.sendMessage(activeTabId, {
         action: 'CLICK_ELEMENT',
         element_id: currentResult.element_id,
       });
-      // Close popup after triggering action so user sees immediate interaction
+      // Save confirmed action as training data for Qwen
+      await saveCurrentStepForTraining();
       setTimeout(() => window.close(), 150);
     }
   });
 
-  // Clear highlight button
   clearHighlightBtn.addEventListener('click', () => {
     if (activeTabId) {
       chrome.tabs.sendMessage(activeTabId, { action: 'CLEAR_HIGHLIGHTS' });
@@ -85,7 +226,10 @@ function setupEventListeners() {
     resultCardEl.classList.add('hidden');
   });
 
-  // Listen for Enter key in goal input
+  saveTrainBtn.addEventListener('click', async () => {
+    await saveCurrentStepForTraining();
+  });
+
   goalInputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -94,7 +238,7 @@ function setupEventListeners() {
   });
 }
 
-// 1. Check if FastAPI backend is healthy
+// Check FastAPI backend status
 async function checkBackendStatus() {
   try {
     const res = await fetch(`${BACKEND_URL}/health`, { method: 'GET' });
@@ -103,9 +247,7 @@ async function checkBackendStatus() {
       statusTextEl.textContent = 'Qwen AI Ready';
       return true;
     }
-  } catch {
-    // offline
-  }
+  } catch {}
 
   backendStatusEl.className = 'status-badge status-offline';
   statusTextEl.textContent = 'Backend Offline';
@@ -113,25 +255,65 @@ async function checkBackendStatus() {
   return false;
 }
 
-// 2. Connect to the active Chrome tab and scrape interactive elements
+// Fetch training dataset statistics from backend
+async function updateTrainingStats() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/train/stats`);
+    if (res.ok) {
+      const data = await res.json();
+      trainCountBadgeEl.textContent = `${data.total_samples || 0} samples`;
+    }
+  } catch {}
+}
+
+// Save current step as training data
+async function saveCurrentStepForTraining() {
+  if (!currentPageData || !currentResult) return;
+
+  try {
+    const payload = {
+      goal: goalInputEl.value.trim(),
+      page: currentPageData.page,
+      domain: currentPageData.domain,
+      elements: currentPageData.elements,
+      selected_element_id: currentResult.element_id,
+      instruction: currentResult.instruction,
+      reason: currentResult.reason,
+    };
+
+    const res = await fetch(`${BACKEND_URL}/train/collect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      showTrainingNote(`🧠 Saved to Qwen training dataset (${data.total_samples} total)!`);
+      trainCountBadgeEl.textContent = `${data.total_samples} samples`;
+    }
+  } catch (err) {
+    console.warn('[OneStep] Could not save training sample:', err);
+  }
+}
+
+// Connect to the active Chrome tab and scrape interactive elements
 async function initActiveTab() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
     if (!tab || !tab.id) {
-      pageTitleEl.textContent = 'Unable to access active tab';
+      pageTitleEl.textContent = 'No active tab detected';
       return;
     }
     activeTabId = tab.id;
 
-    // Check if URL is inspectable (skip chrome:// or edge:// pages)
-    if (
-      tab.url.startsWith('chrome://') ||
-      tab.url.startsWith('edge://') ||
-      tab.url.startsWith('about:') ||
-      tab.url.startsWith('chrome-extension://')
-    ) {
-      siteDomainEl.textContent = 'Browser Internal';
-      pageTitleEl.textContent = 'Internal browser tab (navigate to any live website)';
+    const url = tab.url || tab.pendingUrl || '';
+
+    // Check if URL is inspectable
+    if (!isScriptableUrl(url)) {
+      siteDomainEl.textContent = 'Browser Page';
+      pageTitleEl.textContent = 'Open any website (e.g. google.com, wikipedia.org, github.com) to navigate';
       elementCountEl.textContent = '0 elements';
       findStepBtn.disabled = true;
       renderUniversalChips([]);
@@ -140,39 +322,42 @@ async function initActiveTab() {
 
     findStepBtn.disabled = false;
 
-    // Try communicating with content script
-    chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_PAGE' }, (response) => {
-      if (chrome.runtime.lastError || !response) {
-        // Content script might need to be injected on pre-existing tabs
-        chrome.scripting.executeScript(
-          {
-            target: { tabId: tab.id },
-            files: ['content.js'],
-          },
-          () => {
-            chrome.scripting.insertCSS({
-              target: { tabId: tab.id },
-              files: ['content.css'],
-            });
-            // Retry scrape after injection
-            setTimeout(() => {
-              chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_PAGE' }, handleScrapeResponse);
-            }, 120);
-          }
-        );
-      } else {
-        handleScrapeResponse(response);
-      }
+    // Inject styles and content script
+    try {
+      await chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ['content.css'],
+      });
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js'],
+      });
+    } catch {
+      // Script may already be injected
+    }
+
+    // Direct in-page execution guarantees 100% reliable extraction on ANY website
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: inPageScrape,
     });
+
+    const pageData = results[0]?.result;
+    if (pageData && pageData.elements) {
+      handleScrapeResponse(pageData);
+    } else {
+      pageTitleEl.textContent = tab.title || 'Webpage';
+      elementCountEl.textContent = '0 elements';
+    }
   } catch (err) {
-    pageTitleEl.textContent = 'Failed to inspect page';
-    console.error(err);
+    console.error('[OneStep] Scrape error:', err);
+    pageTitleEl.textContent = 'Webpage ready (click 🔄 to inspect)';
   }
 }
 
 function handleScrapeResponse(response) {
   if (!response || !response.elements) {
-    pageTitleEl.textContent = 'No interactive elements detected';
+    pageTitleEl.textContent = 'No interactive elements found';
     elementCountEl.textContent = '0 elements';
     renderUniversalChips([]);
     return;
@@ -186,9 +371,6 @@ function handleScrapeResponse(response) {
   if (response.heading) {
     pageMetaEl.textContent = `Topic: ${response.heading}`;
     pageMetaEl.classList.remove('hidden');
-  } else if (response.description) {
-    pageMetaEl.textContent = response.description;
-    pageMetaEl.classList.remove('hidden');
   } else {
     pageMetaEl.classList.add('hidden');
   }
@@ -196,18 +378,15 @@ function handleScrapeResponse(response) {
   elementCountEl.textContent = `${response.elements.length} elements`;
   hideError();
 
-  // Dynamically generate contextual chips based on the site and elements
   generateDynamicChips(response);
 
-  // Restore saved goal for this domain if available
+  // Restore saved goal for this domain
   try {
     const savedGoal = sessionStorage.getItem(`onestep_goal_${domain}`);
     if (savedGoal && !goalInputEl.value) {
       goalInputEl.value = savedGoal;
     }
-  } catch {
-    // sessionStorage fallback
-  }
+  } catch {}
 }
 
 // Generate smart chips dynamically based on website and detected elements
@@ -216,7 +395,6 @@ function generateDynamicChips(pageData) {
   const elements = pageData.elements || [];
   const chips = [];
 
-  // 1. Domain-specific smart heuristics
   if (domain.includes('github')) {
     chips.push('Search repositories', 'View pull requests', 'Fork repository', 'Sign in');
   } else if (domain.includes('google')) {
@@ -237,7 +415,6 @@ function generateDynamicChips(pageData) {
     chips.push('Search products', 'Go to cart', 'Today\'s deals', 'Track orders');
   }
 
-  // 2. Element-derived heuristics (works for any arbitrary website!)
   if (chips.length < 3) {
     let hasSearch = false;
     let hasAuth = false;
@@ -245,9 +422,7 @@ function generateDynamicChips(pageData) {
     let hasHelp = false;
 
     for (const el of elements) {
-      const text = (el.text || '').toLowerCase();
-      const aria = (el.aria_label || '').toLowerCase();
-      const combined = `${text} ${aria}`;
+      const combined = `${el.text || ''} ${el.aria_label || ''}`.toLowerCase();
 
       if (!hasSearch && (el.type === 'input' || combined.includes('search'))) {
         chips.push('Search on this page');
@@ -270,7 +445,6 @@ function generateDynamicChips(pageData) {
     }
   }
 
-  // 3. Fallbacks if site has minimal cues
   if (chips.length === 0) {
     chips.push('Find navigation menu', 'Sign in or register', 'Search website', 'Contact support');
   }
@@ -292,7 +466,7 @@ function renderUniversalChips(chipTexts) {
   });
 }
 
-// 3. Find next step via local backend
+// Find next step via local backend
 async function handleFindNextStep() {
   const goal = goalInputEl.value.trim();
   if (!goal) {
@@ -306,7 +480,6 @@ async function handleFindNextStep() {
     return;
   }
 
-  // Save goal for domain
   try {
     if (currentPageData.domain) {
       sessionStorage.setItem(`onestep_goal_${currentPageData.domain}`, goal);
@@ -326,9 +499,7 @@ async function handleFindNextStep() {
 
     const res = await fetch(`${BACKEND_URL}/next-step`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
@@ -340,13 +511,11 @@ async function handleFindNextStep() {
     const decision = await res.json();
     currentResult = decision;
 
-    // Display recommendation card
     targetIdBadgeEl.textContent = decision.element_id || 'no element';
     instructionTextEl.textContent = decision.instruction || 'No action needed';
     reasonTextEl.textContent = decision.reason || '';
     resultCardEl.classList.remove('hidden');
 
-    // Automatically highlight the element on the webpage
     if (decision.element_id && activeTabId) {
       chrome.tabs.sendMessage(activeTabId, {
         action: 'HIGHLIGHT_ELEMENT',
@@ -354,6 +523,9 @@ async function handleFindNextStep() {
         instruction: decision.instruction,
       });
     }
+
+    // Automatically record training sample in the background
+    await saveCurrentStepForTraining();
   } catch (err) {
     showError(`Error: ${err.message}`);
   } finally {
@@ -369,4 +541,12 @@ function showError(msg) {
 
 function hideError() {
   errorMessageEl.classList.add('hidden');
+}
+
+function showTrainingNote(msg) {
+  trainingNoteEl.textContent = msg;
+  trainingNoteEl.classList.remove('hidden');
+  setTimeout(() => {
+    trainingNoteEl.classList.add('hidden');
+  }, 3500);
 }

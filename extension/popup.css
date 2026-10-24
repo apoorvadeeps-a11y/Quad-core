@@ -455,6 +455,38 @@ input[type="text"]:focus {
   color: #2B2825;
 }
 
+.dot-separator {
+  color: #C0B8AC;
+  font-size: 10px;
+  margin: 0 4px;
+}
+
+.training-banner {
+  background: #E8F5E9;
+  border: 1px solid #C8E6C9;
+  color: #2E7D32;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.train-badge {
+  background: rgba(118, 86, 167, 0.12);
+  color: #7656A7;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
 .hidden {
   display: none !important;
 }

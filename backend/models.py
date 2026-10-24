@@ -81,3 +81,19 @@ class NextResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
+
+
+class TrainingSample(BaseModel):
+    goal: str
+    page: str
+    domain: Optional[str] = ""
+    elements: list[dict]
+    selected_element_id: Optional[str] = None
+    instruction: Optional[str] = None
+    reason: Optional[str] = None
+    source: Optional[str] = "browser_extension"
+
+    model_config = {
+        "extra": "ignore",
+    }
+

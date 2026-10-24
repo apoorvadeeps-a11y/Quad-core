@@ -12,8 +12,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from models import HealthResponse, NextStepRequest, NextResponse
+import json
+from models import HealthResponse, NextStepRequest, NextResponse, TrainingSample
 from ai_service import get_ai_next_step
+
+TRAINING_FILE = backend_dir / "training_data.jsonl"
 
 app = FastAPI(
     title="OneStep API",
@@ -114,6 +117,64 @@ async def next_step(payload: NextStepRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI evaluation failed: {str(exc)}",
         )
+
+
+@app.post("/train/collect", tags=["Training"])
+async def collect_training_sample(sample: TrainingSample):
+    """
+    Store real-world website interactive elements and chosen navigation action as a training sample.
+    """
+    try:
+        sample_dict = sample.model_dump()
+        with open(TRAINING_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(sample_dict, ensure_ascii=False) + "\n")
+        
+        # Calculate total count
+        count = 0
+        if TRAINING_FILE.exists():
+            with open(TRAINING_FILE, "r", encoding="utf-8") as f:
+                count = sum(1 for line in f if line.strip())
+
+        return {
+            "status": "saved",
+            "total_samples": count,
+            "message": f"Successfully collected training sample from {sample.domain or sample.page}."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save training sample: {str(e)}"
+        )
+
+
+@app.get("/train/stats", tags=["Training"])
+async def get_training_stats():
+    """
+    Retrieve statistics on training samples collected from any websites.
+    """
+    if not TRAINING_FILE.exists():
+        return {"total_samples": 0, "domains": []}
+
+    total = 0
+    domains = set()
+    try:
+        with open(TRAINING_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    total += 1
+                    try:
+                        data = json.loads(line)
+                        if data.get("domain"):
+                            domains.add(data["domain"])
+                    except Exception:
+                        pass
+        return {
+            "total_samples": total,
+            "unique_domains": list(domains),
+            "file_path": str(TRAINING_FILE)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

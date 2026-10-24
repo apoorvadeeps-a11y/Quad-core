@@ -83,17 +83,23 @@
       </div>
       <div class="card-footer-row">
         <button id="clearHighlightBtn" class="subtle-link-btn">Clear page highlight</button>
+        <span class="dot-separator">•</span>
+        <button id="saveTrainBtn" class="subtle-link-btn" title="Save this step to train Qwen">🧠 Save for Training</button>
       </div>
     </div>
 
     <!-- Error / Status Note -->
     <div id="errorMessage" class="error-banner hidden"></div>
+    <div id="trainingNote" class="training-banner hidden"></div>
 
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-row">
         <span>Connected to local AI model (<a href="http://localhost:8000/docs" target="_blank">Ollama Qwen</a>)</span>
-        <button id="refreshPageBtn" class="icon-refresh-btn" title="Re-scan webpage">🔄</button>
+        <div class="footer-actions">
+          <span id="trainCountBadge" class="train-badge" title="Collected training samples">0 samples</span>
+          <button id="refreshPageBtn" class="icon-refresh-btn" title="Re-scan webpage">🔄</button>
+        </div>
       </div>
     </footer>
   </div>
