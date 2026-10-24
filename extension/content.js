@@ -153,9 +153,16 @@ function scrapeInteractiveElements() {
   for (const node of nodes) {
     if (!isElementVisible(node)) continue;
 
-    // Skip nested children if their parent is already an interactive button or link
-    const parentInteractive = node.parentElement?.closest('button, a[href], select, textarea, input, [role="button"], [role="link"]');
-    if (parentInteractive && nodes.includes(parentInteractive)) {
+    // Skip nested children if their parent is already an interactive button or candidate
+    const isInsideOtherCandidate = nodes.some(
+      (cand) => cand !== node && cand.contains(node)
+    );
+    if (isInsideOtherCandidate) continue;
+
+    const parentInteractive = node.parentElement?.closest(
+      'button, a, select, textarea, input, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex="0"]'
+    );
+    if (parentInteractive && parentInteractive !== node) {
       continue;
     }
 
@@ -164,13 +171,13 @@ function scrapeInteractiveElements() {
     if (!rawText && !node.id && node.tagName !== 'INPUT' && !node.isContentEditable) continue;
 
     // Determine or assign stable element identifier
-    let elId = node.id ? node.id.trim() : '';
-    if (!elId || seenIds.has(elId) || elId.length > 50) {
-      elId = node.getAttribute('data-onestep-id');
-      if (!elId || seenIds.has(elId)) {
-        elId = `step_el_${counter++}`;
-        node.setAttribute('data-onestep-id', elId);
+    let elId = (node.id && node.id.trim().length <= 50) ? node.id.trim() : '';
+    if (!elId || seenIds.has(elId)) {
+      while (seenIds.has(`step_el_${counter}`)) {
+        counter++;
       }
+      elId = `step_el_${counter++}`;
+      node.setAttribute('data-onestep-id', elId);
     }
     seenIds.add(elId);
 

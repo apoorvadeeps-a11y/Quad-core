@@ -106,6 +106,12 @@ class AIResult(dict):
         self[name] = value
 
 
+STOPWORDS: set[str] = {
+    "with", "to", "on", "in", "and", "the", "a", "an", "for", "of", "from",
+    "at", "by", "or", "is", "it", "my", "me", "this", "page", "site", "web",
+    "website", "please", "can", "you", "i", "want", "need", "go"
+}
+
 MAPPINGS: dict[str, list[str]] = {
     "search": ["search", "find", "query", "lookup"],
     "find": ["search", "find", "lookup"],
@@ -116,11 +122,22 @@ MAPPINGS: dict[str, list[str]] = {
     "electricity": ["payment", "payments", "utility", "services"],
     "back": ["back", "return", "previous", "dashboard", "home", "back to dashboard"],
     "dashboard": ["dashboard", "home", "back to dashboard"],
-    "login": ["sign in", "login", "log in", "account", "profile"],
-    "signin": ["sign in", "login", "log in", "account"],
-    "register": ["sign up", "register", "create account", "join"],
-    "signup": ["sign up", "register", "create account"],
-    "logout": ["logout", "log out", "sign out"],
+    "login": ["sign in", "login", "log in", "account", "continue with", "sign in with"],
+    "signin": ["sign in", "login", "log in", "account", "continue with"],
+    "register": ["sign up", "register", "create account", "join", "sign up for free"],
+    "signup": ["sign up", "register", "create account", "sign up for free"],
+    "google": ["google", "continue with google", "sign in with google", "log in with google"],
+    "apple": ["apple", "continue with apple", "sign in with apple"],
+    "phone": ["phone", "continue with phone"],
+    "chat": ["chat", "ask", "composer", "prompt", "message", "send", "textarea", "ask chatgpt"],
+    "message": ["message", "send", "chat", "ask", "textarea", "send message"],
+    "send": ["send", "submit", "post", "enter", "send message"],
+    "prompt": ["prompt", "ask", "chat", "textarea", "input"],
+    "hi": ["prompt", "ask", "chat", "textarea", "input", "message", "ask chatgpt"],
+    "hello": ["prompt", "ask", "chat", "textarea", "input", "message"],
+    "explore": ["explore", "discover", "browse"],
+    "upgrade": ["upgrade", "pricing", "plans", "pro", "plus", "see plans"],
+    "pricing": ["pricing", "plans", "upgrade", "see plans and pricing"],
     "cart": ["cart", "basket", "bag", "checkout", "view cart"],
     "buy": ["buy", "purchase", "order", "add to cart", "checkout"],
     "checkout": ["checkout", "pay", "order", "place order"],
@@ -129,12 +146,12 @@ MAPPINGS: dict[str, list[str]] = {
 }
 
 
-def _score_element_relevance(el: Any, goal: str) -> int:
+def _score_element_relevance(el: Any, goal: str, domain: str = "") -> int:
     """Compute deterministic semantic relevance of an element against the user goal."""
     if not goal:
         return 0
-    goal_words = set(re.findall(r"\w+", goal.lower()))
-    if not goal_words:
+    clean_goal = goal.lower().strip()
+    if not clean_goal:
         return 0
 
     text = (el.get("text") if isinstance(el, dict) else getattr(el, "text", "")) or ""
@@ -150,33 +167,43 @@ def _score_element_relevance(el: Any, goal: str) -> int:
         return 0
 
     score = 0
-    clean_goal = goal.lower().strip()
     # Exact full match
-    if clean_goal and clean_goal in [t_clean, a_clean, p_clean]:
-        score += 100
+    if clean_goal in [t_clean, a_clean, p_clean]:
+        score += 150
+    elif clean_goal in combined:
+        score += 80
 
-    for gw in goal_words:
-        if len(gw) > 2:
-            if gw == t_clean or gw == a_clean or gw == p_clean:
+    domain_clean = re.sub(r"^(www\.)|(\.com|\.org|\.net|\.in|\.io|\.gov|\.nic\.in)$", "", domain.lower().strip())
+    words = [w for w in re.findall(r"\w+", clean_goal) if w not in STOPWORDS]
+    if domain_clean and len(domain_clean) > 2:
+        words = [w for w in words if w != domain_clean]
+
+    for w in words:
+        if len(w) > 1:
+            if w == t_clean or w == a_clean or w == p_clean:
                 score += 50
-            elif gw in combined:
+            elif w in combined:
                 score += 35
 
-            if gw in MAPPINGS:
-                for term in MAPPINGS[gw]:
-                    if term in combined:
+            if w in MAPPINGS:
+                for term in MAPPINGS[w]:
+                    if term == t_clean or term == a_clean or term == p_clean:
+                        score += 45
+                    elif term in combined:
                         score += 30
 
     # Type matching for search / typing inputs
     el_type = (el.get("type") if isinstance(el, dict) else getattr(el, "type", "")) or ""
     el_type_str = str(el_type).lower()
-    if ("search" in goal_words or "find" in goal_words) and ("search" in combined or el_type_str in ["input", "textarea"]):
-        score += 25
+    if any(k in words for k in ["search", "find"]) and ("search" in combined or el_type_str in ["input", "textarea"]):
+        score += 30
+    if any(k in words for k in ["chat", "send", "ask", "prompt", "hi", "hello"]) and el_type_str in ["textarea", "input"]:
+        score += 40
 
     return score
 
 
-def _validate_result(parsed: Any, elements: list[Any], goal: str = "") -> AIResult:
+def _validate_result(parsed: Any, elements: list[Any], goal: str = "", page: str = "") -> AIResult:
     """Validate model output against caller-supplied element IDs with high-accuracy neuro-symbolic verification."""
     fallback_instruction = "No action recommended"
     fallback_reason = "No relevant element found on the current page."
@@ -224,8 +251,21 @@ def _validate_result(parsed: Any, elements: list[Any], goal: str = "") -> AIResu
             best_el = max(elements, key=lambda e: _score_element_relevance(e, goal))
             best_score = _score_element_relevance(best_el, goal)
 
-            # Rule: If every element on the page has 0 score, return null safely
+            # Rule: If every element on the page has 0 score, check if back navigation to dashboard is appropriate
             if best_score == 0:
+                page_lower = (page or "").lower()
+                is_hub = any(h in page_lower for h in ["dashboard", "home", "main"])
+                if not is_hub:
+                    back_el = next((e for e in elements if any(b in ((e.get("text") if isinstance(e, dict) else getattr(e, "text", "")) or "").lower() for b in ["back to dashboard", "back", "return to dashboard"])), None)
+                    if back_el:
+                        back_id = str(back_el.get("id") if isinstance(back_el, dict) else getattr(back_el, "id", "")).strip()
+                        back_label = (back_el.get("text") if isinstance(back_el, dict) else getattr(back_el, "text", "")) or "Back"
+                        return AIResult(
+                            element_id=back_id,
+                            instruction=f"Click {back_label}",
+                            reason=f"The current page does not have options for '{goal}'. Return to dashboard to proceed.",
+                        )
+
                 return AIResult(
                     element_id=None,
                     instruction=fallback_instruction,
@@ -259,134 +299,40 @@ def _validate_result(parsed: Any, elements: list[Any], goal: str = "") -> AIResu
 
 def _heuristic_next_step(goal: str, page: str, elements: list[dict]) -> AIResult:
     """Intelligent fallback matcher ensuring immediate, high-accuracy response on any website."""
-    goal_words = set(re.findall(r"\w+", (goal or "").lower()))
-
-    # Universal website navigation and semantic intent mappings (NO explore under search)
-    mappings: dict[str, list[str]] = {
-        # Universal search & discovery
-        "search": ["search", "find", "query", "lookup"],
-        "find": ["search", "find", "lookup", "browse"],
-        # Authentication & user profile
-        "login": ["sign in", "login", "log in", "account", "profile"],
-        "signin": ["sign in", "login", "log in", "account"],
-        "register": ["sign up", "register", "create account", "join"],
-        "signup": ["sign up", "register", "create account"],
-        "logout": ["logout", "log out", "sign out"],
-        "profile": ["profile", "account", "user", "settings", "my account"],
-        # E-commerce, shopping & checkout
-        "cart": ["cart", "basket", "bag", "checkout", "view cart"],
-        "buy": ["buy", "purchase", "order", "add to cart", "checkout"],
-        "checkout": ["checkout", "pay", "order", "place order"],
-        "price": ["pricing", "plans", "price", "subscription"],
-        "pricing": ["pricing", "plans", "subscription", "upgrade"],
-        # Navigation & return
-        "back": ["back", "return", "previous", "dashboard", "home"],
-        "home": ["home", "dashboard", "main", "logo"],
-        "dashboard": ["dashboard", "home", "back to dashboard"],
-        # Help & settings
-        "settings": ["settings", "preferences", "config", "gear", "options"],
-        "help": ["help", "support", "faq", "contact", "customer service"],
-        "contact": ["contact", "support", "help", "email us"],
-        # Specific government/citizen services
-        "address": ["citizen services", "services", "profile", "settings", "account", "address"],
-        "residential": ["citizen services", "residence", "profile"],
-        "bill": ["payment", "payments", "pay", "billing", "invoice"],
-        "pay": ["payment", "payments", "pay", "checkout"],
-        "electricity": ["payment", "payments", "utility", "services"],
-        "tax": ["payment", "citizen services", "finance"],
-    }
-
-    best_el = None
-    best_score = 0
-
-    for el in elements:
-        score = _score_element_relevance(el, goal)
-        if score > best_score:
-            best_score = score
-            best_el = el
-
-    # If no exact score, check boosted terms
-    if best_score <= 0:
-        boosted_terms: set[str] = set()
-        for word in goal_words:
-            if word in mappings:
-                boosted_terms.update(mappings[word])
-
-        for el in elements:
-            text = (el.get("text") or "").lower()
-            aria = (el.get("aria_label") or "").lower()
-            eid = (el.get("id") or "").lower()
-            placeholder = (el.get("placeholder") or "").lower()
-            combined = f"{text} {aria} {eid} {placeholder}"
-
-            score = 0
-            for bt in boosted_terms:
-                if bt in combined:
-                    score += 5
-
-            if score > best_score:
-                best_score = score
-                best_el = el
-
-    if best_el is None or best_score <= 0:
+    if not elements:
         return AIResult(
             element_id=None,
             instruction="No relevant element found on this page",
             reason="None of the visible elements appear relevant to your specified goal.",
         )
 
-    label = best_el.get("text") or best_el.get("placeholder") or best_el.get("aria_label") or best_el.get("id")
-    return AIResult(
-        element_id=best_el["id"],
-        instruction=f"Click {label}",
-        reason="Selected as the most relevant next step for your goal.",
-    )
+    best_el = max(elements, key=lambda el: _score_element_relevance(el, goal))
+    best_score = _score_element_relevance(best_el, goal)
 
-    boosted_terms: set[str] = set()
-    for word in goal_words:
-        if word in mappings:
-            boosted_terms.update(mappings[word])
-
-    best_element = None
-    best_score = 0
-
-    for el in elements:
-        text = (el.get("text") or "").lower()
-        aria = (el.get("aria_label") or "").lower()
-        eid = (el.get("id") or "").lower()
-        placeholder = (el.get("placeholder") or "").lower()
-        combined = f"{text} {aria} {eid} {placeholder}"
-
-        score = 0
-        for gw in goal_words:
-            if len(gw) > 2 and gw in combined:
-                score += 3
-        for bt in boosted_terms:
-            if bt in combined:
-                score += 5
-
-        # Small bonus for matching input type if goal mentions search or enter
-        el_type = (el.get("type") or "").lower()
-        if ("search" in goal_words or "find" in goal_words) and (el_type == "input" or "search" in combined):
-            score += 2
-
-        if score > best_score:
-            best_score = score
-            best_element = el
-
-    # If no element scored any relevance, return null/None safely
-    if best_element is None or best_score <= 0:
+    if best_score > 0:
+        label = best_el.get("text") or best_el.get("placeholder") or best_el.get("aria_label") or best_el.get("id")
         return AIResult(
-            element_id=None,
-            instruction="No relevant element found on this page",
-            reason="None of the visible elements appear relevant to your specified goal.",
+            element_id=best_el["id"],
+            instruction=f"Click {label}",
+            reason="Selected as the most relevant next step for your goal.",
         )
 
-    label = best_element.get("text") or best_element.get("placeholder") or best_element.get("id")
+    # Check if page is not hub and back navigation exists
+    page_lower = (page or "").lower()
+    is_hub = any(h in page_lower for h in ["dashboard", "home", "main"])
+    if not is_hub:
+        back_el = next((e for e in elements if any(b in ((e.get("text") or "")).lower() for b in ["back to dashboard", "back", "return to dashboard"])), None)
+        if back_el:
+            return AIResult(
+                element_id=back_el["id"],
+                instruction=f"Click {back_el.get('text') or 'Back'}",
+                reason=f"The current page does not have options for '{goal}'. Return to dashboard to proceed.",
+            )
+
     return AIResult(
-        element_id=best_element["id"],
-        instruction=f"Click {label}",
-        reason="Selected as the most relevant next step for your goal.",
+        element_id=None,
+        instruction="No relevant element found on this page",
+        reason="None of the visible elements appear relevant to your specified goal.",
     )
 
 
@@ -515,7 +461,7 @@ async def get_ai_next_step(goal: str, page: str, elements: list[Any]) -> AIResul
 
             parsed = _parse_json(raw_content)
             if parsed:
-                validated = _validate_result(parsed, cleaned_elements, goal=safe_goal)
+                validated = _validate_result(parsed, cleaned_elements, goal=safe_goal, page=safe_page)
                 if validated.get("element_id") is not None:
                     return validated
         except Exception:

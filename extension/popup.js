@@ -72,7 +72,7 @@ function inPageScrape() {
       text = node.value || node.getAttribute('placeholder') || '';
     }
     if (!text) {
-      text = node.getAttribute('aria-label') || node.getAttribute('title') || '';
+      text = node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('data-testid') || '';
     }
     if (!text) {
       const img = node.querySelector('img[alt]');
@@ -86,7 +86,7 @@ function inPageScrape() {
       }
     }
     if (!text) {
-      const lower = ((node.className || '') + ' ' + (node.id || '')).toLowerCase();
+      const lower = ((node.className || '') + ' ' + (node.id || '') + ' ' + (node.getAttribute('data-testid') || '')).toLowerCase();
       if (lower.includes('search')) text = 'Search';
       else if (lower.includes('cart') || lower.includes('bag')) text = 'Cart';
       else if (lower.includes('menu') || lower.includes('nav')) text = 'Menu';
@@ -137,22 +137,29 @@ function inPageScrape() {
   for (const node of candidates) {
     if (!isVisible(node)) continue;
 
-    // Skip nested children if their parent is already an interactive button or link
-    const parentInteractive = node.parentElement?.closest('button, a[href], select, textarea, input, [role="button"], [role="link"]');
-    if (parentInteractive && candidates.includes(parentInteractive)) {
+    // Skip nested children if their parent is already an interactive button, link, or candidate
+    const isInsideOtherCandidate = candidates.some(
+      (cand) => cand !== node && cand.contains(node)
+    );
+    if (isInsideOtherCandidate) continue;
+
+    const parentInteractive = node.parentElement?.closest(
+      'button, a, select, textarea, input, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex="0"]'
+    );
+    if (parentInteractive && parentInteractive !== node) {
       continue;
     }
 
     const text = extractText(node);
     if (!text && !node.id && node.tagName !== 'INPUT' && !node.isContentEditable) continue;
 
-    let elId = node.id ? node.id.trim() : '';
-    if (!elId || seenIds.has(elId) || elId.length > 50) {
-      elId = node.getAttribute('data-onestep-id');
-      if (!elId || seenIds.has(elId)) {
-        elId = `step_el_${counter++}`;
-        node.setAttribute('data-onestep-id', elId);
+    let elId = (node.id && node.id.trim().length <= 50) ? node.id.trim() : '';
+    if (!elId || seenIds.has(elId)) {
+      while (seenIds.has(`step_el_${counter}`)) {
+        counter++;
       }
+      elId = `step_el_${counter++}`;
+      node.setAttribute('data-onestep-id', elId);
     }
     seenIds.add(elId);
 
