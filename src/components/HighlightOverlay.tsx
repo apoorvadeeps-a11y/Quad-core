@@ -118,40 +118,40 @@ export const HighlightOverlay: React.FC<HighlightOverlayProps> = ({
         height: `${rect.height + 8}px`,
       }}
     >
-      {/* 2-3px glowing outline around the target element */}
       <div
         className={`w-full h-full rounded-lg transition-all duration-300 ${
           isPulsing ? 'animate-pulse' : ''
         }`}
         style={{
-          border: `3px solid ${highlightColor.hex}`,
-          boxShadow: `0 0 0 1px rgba(255, 255, 255, 0.4), 0 0 18px 3px ${highlightColor.glow}`,
+          border: `2px solid ${highlightColor.hex}`,
+          boxShadow: `0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 16px 2px ${highlightColor.glow}`,
         }}
       />
 
       {/* Floating tooltip badge */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-auto shadow-lg transition-all duration-200"
+        className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-auto shadow-md transition-all duration-200"
         style={{
           ...(isNearTop
-            ? { top: `${rect.height + 14}px` }
-            : { bottom: `${rect.height + 14}px` }),
+            ? { top: `${rect.height + 12}px` }
+            : { bottom: `${rect.height + 12}px` }),
         }}
       >
         <button
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             if (onTargetClick) onTargetClick();
             if (elementRef.current) {
               elementRef.current.click();
             }
           }}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-transform hover:scale-105 active:scale-95 shadow-md whitespace-nowrap"
+          className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-transform hover:scale-[1.01] active:scale-[0.99] shadow-sm whitespace-nowrap border border-white/30"
           style={{
             backgroundColor: highlightColor.badgeBg,
             color: highlightColor.badgeText,
           }}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
           <span>{tooltipText}</span>
         </button>
       </div>

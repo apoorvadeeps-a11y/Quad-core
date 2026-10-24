@@ -34,14 +34,12 @@ export const MockPortal: React.FC<MockPortalProps> = ({
   const portalContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="relative flex-1 flex h-full overflow-hidden bg-[#F7F3EC] select-text">
-      {/* Mock Portal Sidebar */}
+    <div className="relative flex-1 flex h-full overflow-hidden bg-[var(--bg-main)] select-text">
       <PortalSidebar
         currentRoute={currentRoute}
         onNavigate={(route) => onNavigate(route)}
       />
 
-      {/* Main Page Area */}
       <div
         ref={portalContainerRef}
         className="relative flex-1 overflow-y-auto overflow-x-hidden min-w-0"

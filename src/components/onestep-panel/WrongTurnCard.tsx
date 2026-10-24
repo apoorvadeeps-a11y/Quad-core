@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, ArrowRight, CornerDownLeft, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Navigation, X } from 'lucide-react';
 import { PortalRoute } from '../../types';
 
 interface WrongTurnCardProps {
@@ -10,6 +10,15 @@ interface WrongTurnCardProps {
   onDismiss: () => void;
 }
 
+const routeLabels: Record<PortalRoute, string> = {
+  dashboard: 'Dashboard',
+  academics: 'Academic Records',
+  finance: 'Finance',
+  attendance: 'Attendance',
+  library: 'Library',
+  settings: 'Settings',
+};
+
 export const WrongTurnCard: React.FC<WrongTurnCardProps> = ({
   currentRoute,
   expectedRoute,
@@ -18,39 +27,38 @@ export const WrongTurnCard: React.FC<WrongTurnCardProps> = ({
   onDismiss,
 }) => {
   return (
-    <div className="mx-4 my-2 p-3.5 rounded-xl border border-[#C86D51]/40 bg-[#FFFDF9] shadow-sm space-y-3 animate-in fade-in slide-in-from-top duration-200">
-      <div className="flex items-start gap-2.5">
-        <div className="p-1.5 rounded-lg bg-[#C86D51]/15 text-[#C86D51] shrink-0 mt-0.5">
-          <AlertCircle className="w-4 h-4" />
+    <div className="mx-4 mt-3 rounded-xl border border-[var(--accent-peach)] bg-[var(--surface-card)] shadow-sm overflow-hidden">
+      <div className="p-3.5 space-y-2.5">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent-peach)]/40 text-[var(--accent-warn)] flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--text-primary)]">Off the path</h3>
+              <p className="text-xs text-[var(--text-secondary)]">Let's get back on track</p>
+            </div>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="p-1 rounded-md text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <div>
-          <h4 className="text-xs font-bold text-[#2B2825]">
-            Looks like we're on a different page.
-          </h4>
-          <p className="text-[11px] text-[#6E6860] mt-0.5 leading-relaxed">
-            You're currently in <strong className="capitalize text-[#2B2825]">{currentRoute}</strong>, but our next step requires <strong className="capitalize text-[#7656A7]">{expectedRoute}</strong>.
-          </p>
+
+        <div className="text-sm text-[var(--text-secondary)] space-y-1">
+          <p>You're in <span className="text-[var(--text-primary)]">{routeLabels[currentRoute]}</span></p>
+          <p>Next step: <span className="text-[var(--text-primary)]">{expectedInstruction}</span> — <span className="text-[var(--text-primary)]">{routeLabels[expectedRoute]}</span></p>
         </div>
-      </div>
 
-      <p className="text-[11px] font-semibold text-[#7656A7]">
-        Let's get you back on track.
-      </p>
-
-      <div className="flex items-center gap-2 pt-1">
         <button
           onClick={onRecoverRoute}
-          className="flex-1 py-1.5 px-3 rounded-lg bg-[#7656A7] hover:bg-[#654791] text-white text-xs font-semibold cursor-pointer transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+          className="w-full py-2 px-3 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
         >
-          <CornerDownLeft className="w-3 h-3" />
+          <Navigation className="w-4 h-4" />
           <span>Find the right path</span>
-        </button>
-
-        <button
-          onClick={onDismiss}
-          className="py-1.5 px-3 rounded-lg bg-[#F7F3EC] hover:bg-[#EFE9DF] text-[#6E6860] hover:text-[#2B2825] text-xs font-medium cursor-pointer transition-colors border border-[#E5DEC9]"
-        >
-          Continue from here
         </button>
       </div>
     </div>

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Target, Wand2, CheckCircle2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import { ProgressBar } from './ProgressBar';
 import { InstructionCard } from './InstructionCard';
 import { AskOneStepInput } from './AskOneStepInput';
-import { WorkflowDefinition, WorkflowStep } from '../../types';
+import { WorkflowDefinition } from '../../types';
 
 interface GuideViewProps {
   workflow: WorkflowDefinition;
@@ -26,36 +26,26 @@ export const GuideView: React.FC<GuideViewProps> = ({
   const totalSteps = workflow.steps.length;
 
   return (
-    <div className="p-4 space-y-4 flex-1 flex flex-col justify-between overflow-y-auto">
-      <div className="space-y-4">
-        {/* Goal Card */}
-        <div className="bg-[#FFFDF9] border border-[#E5DEC9] rounded-xl p-3.5 shadow-xs">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#7656A7] uppercase tracking-wider">
-              <Target className="w-3.5 h-3.5" />
-              <span>Current Goal</span>
-            </div>
+    <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="px-5 pt-5 pb-4 space-y-4">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Current task</span>
             <button
               onClick={onSwitchToAgent}
-              className="text-[11px] text-[#7656A7] hover:text-[#654791] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-              title="Let OneStep automate remaining steps"
+              className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              title="Switch to automated mode"
             >
-              <Wand2 className="w-3 h-3" />
-              <span>Switch to Agent</span>
+              <Wand2 className="w-3.5 h-3.5" />
+              <span>Do It For Me</span>
             </button>
           </div>
-          <h2 className="text-xs font-bold text-[#2B2825] leading-snug">
+          <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)] leading-snug">
             {workflow.title}
           </h2>
-          <div className="mt-3">
-            <ProgressBar
-              currentStep={currentStepIndex + 1}
-              totalSteps={totalSteps}
-            />
-          </div>
+          <ProgressBar currentStep={currentStepIndex + 1} totalSteps={totalSteps} />
         </div>
 
-        {/* Current Instruction Card */}
         <InstructionCard
           step={currentStep}
           onShowMe={onShowMe}
@@ -63,30 +53,29 @@ export const GuideView: React.FC<GuideViewProps> = ({
           onPerformStepForMe={onPerformStepForMe}
         />
 
-        {/* Step Checklist Preview */}
-        <div className="bg-[#FFFDF9] border border-[#E5DEC9] rounded-xl p-3 shadow-xs">
-          <span className="text-[10px] font-bold text-[#6E6860] uppercase tracking-wider block mb-2">
-            Workflow Pathway
-          </span>
-          <div className="space-y-1.5">
+        <div className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card)] overflow-hidden">
+          <div className="px-3 py-2 border-b border-[var(--surface-border)] bg-[var(--bg-main)]">
+            <span className="text-xs font-medium text-[var(--text-primary)]">Steps</span>
+          </div>
+          <div className="divide-y divide-[var(--surface-border)]">
             {workflow.steps.map((st, idx) => {
               const isPast = idx < currentStepIndex;
               const isCurrent = idx === currentStepIndex;
               return (
                 <div
                   key={st.id}
-                  className={`flex items-center gap-2 text-xs py-1 px-2 rounded-lg transition-colors ${
-                    isCurrent
-                      ? 'bg-[#7656A7]/10 text-[#7656A7] font-semibold'
-                      : isPast
-                      ? 'text-[#4A7C59]'
-                      : 'text-[#6E6860]'
+                  className={`flex items-start gap-2.5 px-3 py-2 ${
+                    isCurrent ? 'bg-[var(--accent-primary)]/5' : ''
                   }`}
                 >
-                  <span className="font-mono tabular-nums text-[11px] w-4">
-                    {isPast ? '✓' : isCurrent ? '●' : '○'}
+                  <span className={`mt-0.5 text-xs ${isPast ? 'text-[var(--accent-sage)]' : isCurrent ? 'text-[var(--accent-primary)]' : 'text-[var(--text-muted)]'}`}>
+                    {isPast ? '✓' : isCurrent ? '•' : '○'}
                   </span>
-                  <span className="truncate">{st.instruction}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${isCurrent ? 'font-medium text-[var(--text-primary)]' : isPast ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>
+                      {st.instruction}
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -94,12 +83,8 @@ export const GuideView: React.FC<GuideViewProps> = ({
         </div>
       </div>
 
-      {/* Bottom Q&A Input */}
-      <div className="pt-2">
-        <AskOneStepInput
-          currentGoal={workflow.title}
-          currentInstruction={currentStep.instruction}
-        />
+      <div className="mt-auto px-5 pb-5">
+        <AskOneStepInput currentGoal={workflow.title} currentInstruction={currentStep.instruction} />
       </div>
     </div>
   );

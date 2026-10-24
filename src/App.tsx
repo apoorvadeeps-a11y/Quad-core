@@ -408,7 +408,7 @@ export default function App() {
   const highlightTooltipText = activeStep ? activeStep.tooltipText : '';
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#F7F3EC] text-[#2B2825] overflow-hidden select-none">
+    <div className="flex flex-col h-screen w-screen bg-[var(--bg-main)] text-[var(--text-primary)] overflow-hidden select-none">
       {/* Top Browser Navigation & Layout Presets Bar */}
       <BrowserHeader
         currentRoute={currentRoute}
@@ -430,10 +430,10 @@ export default function App() {
           isDragging ? 'cursor-col-resize select-none pointer-events-auto' : ''
         }`}
       >
-        {/* Left Side: Mock University Webpage (approximately 70% width) */}
+        {/* Left Side: Mock University Webpage */}
         <div
           style={{ width: `${layoutRatio}%` }}
-          className="h-full flex flex-col min-w-[380px] overflow-hidden relative"
+          className="h-full flex flex-col min-w-[320px] overflow-hidden relative"
         >
           <MockPortal
             currentRoute={currentRoute}
@@ -448,17 +448,17 @@ export default function App() {
           />
         </div>
 
-        {/* Draggable Divider with Preset Shortcuts */}
+        {/* Draggable Divider */}
         <ResizableDivider
           onDragStart={handleDividerDragStart}
           onReset={() => updateLayoutRatio(70)}
           isDragging={isDragging}
         />
 
-        {/* Right Side: OneStep Assistant Panel (approximately 30% width) */}
+        {/* Right Side: OneStep Assistant Panel */}
         <div
           style={{ width: `${100 - layoutRatio}%` }}
-          className="h-full flex flex-col min-w-[260px] overflow-hidden bg-[#FFFDF9] border-l border-[#E5DEC9]"
+          className="h-full flex flex-col min-w-[280px] overflow-hidden bg-[var(--surface-card)] border-l border-[var(--surface-border)]"
         >
           <OneStepPanel
             mode={mode}

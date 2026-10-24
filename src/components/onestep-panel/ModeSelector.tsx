@@ -1,6 +1,5 @@
 import React from 'react';
 import { MousePointerClick, Wand2 } from 'lucide-react';
-import { AssistantMode } from '../../types';
 
 interface ModeSelectorProps {
   selectedMode: 'guide' | 'agent';
@@ -13,76 +12,60 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
 }) => {
   return (
     <div className="space-y-2">
-      <label className="text-xs font-semibold text-[#6E6860] uppercase tracking-wider block">
-        Choose Assistance Mode
-      </label>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {/* Guide Me Card */}
+      <span className="text-xs font-medium text-[var(--text-secondary)] block">
+        Choose how you'd like help
+      </span>
+      <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => onSelectMode('guide')}
-          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
             selectedMode === 'guide'
-              ? 'bg-[#FFFDF9] border-[#7656A7] shadow-sm ring-1 ring-[#7656A7]'
-              : 'bg-[#F7F3EC]/70 border-[#E5DEC9] hover:bg-[#FFFDF9] hover:border-[#DCD3BE]'
+              ? 'bg-[var(--surface-card)] border-[var(--accent-primary)]/60 shadow-sm'
+              : 'bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--accent-primary)]/30'
           }`}
         >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div
-                className={`p-2 rounded-lg ${
-                  selectedMode === 'guide'
-                    ? 'bg-[#7656A7] text-white'
-                    : 'bg-[#EFE9DF] text-[#6E6860]'
-                }`}
-              >
-                <MousePointerClick className="w-4 h-4" />
-              </div>
-              {selectedMode === 'guide' && (
-                <span className="text-[10px] font-bold text-[#7656A7] bg-[#7656A7]/10 px-2 py-0.5 rounded-full">
-                  Selected
-                </span>
-              )}
+          <div className="flex items-center gap-2 mb-1.5">
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                selectedMode === 'guide'
+                  ? 'bg-[var(--accent-primary)] text-white'
+                  : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
+              }`}
+            >
+              <MousePointerClick className="w-3.5 h-3.5" />
             </div>
-            <h4 className="text-xs font-bold text-[#2B2825]">GUIDE ME</h4>
-            <p className="text-[11px] text-[#6E6860] mt-1 leading-snug">
-              You click. OneStep shows you where to go with adaptive outlines.
-            </p>
+            <span className="text-sm font-medium text-[var(--text-primary)]">Guide Me</span>
           </div>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            You click, I'll show you where to go.
+          </p>
         </button>
 
-        {/* Do It For Me Card */}
         <button
           type="button"
           onClick={() => onSelectMode('agent')}
-          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
             selectedMode === 'agent'
-              ? 'bg-[#FFFDF9] border-[#7656A7] shadow-sm ring-1 ring-[#7656A7]'
-              : 'bg-[#F7F3EC]/70 border-[#E5DEC9] hover:bg-[#FFFDF9] hover:border-[#DCD3BE]'
+              ? 'bg-[var(--surface-card)] border-[var(--accent-primary)]/60 shadow-sm'
+              : 'bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--accent-primary)]/30'
           }`}
         >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div
-                className={`p-2 rounded-lg ${
-                  selectedMode === 'agent'
-                    ? 'bg-[#7656A7] text-white'
-                    : 'bg-[#EFE9DF] text-[#6E6860]'
-                }`}
-              >
-                <Wand2 className="w-4 h-4" />
-              </div>
-              {selectedMode === 'agent' && (
-                <span className="text-[10px] font-bold text-[#7656A7] bg-[#7656A7]/10 px-2 py-0.5 rounded-full">
-                  Selected
-                </span>
-              )}
+          <div className="flex items-center gap-2 mb-1.5">
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                selectedMode === 'agent'
+                  ? 'bg-[var(--accent-primary)] text-white'
+                  : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
+              }`}
+            >
+              <Wand2 className="w-3.5 h-3.5" />
             </div>
-            <h4 className="text-xs font-bold text-[#2B2825]">DO IT FOR ME</h4>
-            <p className="text-[11px] text-[#6E6860] mt-1 leading-snug">
-              OneStep performs allowed steps and asks before important actions.
-            </p>
+            <span className="text-sm font-medium text-[var(--text-primary)]">Do It For Me</span>
           </div>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            I'll work through it and ask before key actions.
+          </p>
         </button>
       </div>
     </div>

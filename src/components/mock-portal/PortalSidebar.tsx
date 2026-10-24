@@ -30,18 +30,18 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
   ];
 
   return (
-    <aside className="w-56 md:w-60 bg-[#FFFDF9] border-r border-[#E5DEC9] flex flex-col justify-between shrink-0 select-none">
+    <aside className="w-56 md:w-60 bg-[var(--surface-card)] border-r border-[var(--surface-border)] flex flex-col justify-between shrink-0 select-none">
       <div>
         {/* University Crest / Title */}
-        <div className="p-4 border-b border-[#E5DEC9] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#7656A7] text-white flex items-center justify-center font-bold shadow-xs">
-            <UniversityIcon className="w-5 h-5 text-white" />
+        <div className="p-4 border-b border-[var(--surface-border)] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center shadow-sm">
+            <UniversityIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm font-bold text-[#2B2825] tracking-tight leading-tight truncate">
+            <h1 className="text-sm font-semibold text-[var(--text-primary)] tracking-tight leading-tight truncate">
               Apex State University
             </h1>
-            <p className="text-[11px] text-[#6E6860] leading-none mt-0.5 truncate">
+            <p className="text-[11px] text-[var(--text-secondary)] leading-none mt-0.5 truncate">
               Student Service Portal
             </p>
           </div>
@@ -49,8 +49,8 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
 
         {/* Navigation List */}
         <nav className="p-3 space-y-1">
-          <div className="px-3 py-1.5 text-[10px] font-semibold text-[#6E6860] uppercase tracking-wider">
-            Portal Menu
+          <div className="px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+            Navigation
           </div>
           {navItems.map((item) => {
             const isActive = currentRoute === item.id;
@@ -59,13 +59,13 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
                 data-onestep-id={item.testId}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all text-left cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-left cursor-pointer ${
                   isActive
-                    ? 'bg-[#7656A7]/10 text-[#7656A7] font-semibold shadow-2xs'
-                    : 'text-[#2B2825] hover:bg-[#EFE9DF]/80 hover:text-[#7656A7]'
+                    ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] font-medium'
+                    : 'text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]'
                 }`}
               >
-                <span className={isActive ? 'text-[#7656A7]' : 'text-[#6E6860]'}>
+                <span className={isActive ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)]'}>
                   {item.icon}
                 </span>
                 <span className="truncate">{item.label}</span>
@@ -76,16 +76,16 @@ export const PortalSidebar: React.FC<PortalSidebarProps> = ({
       </div>
 
       {/* Student Profile Card Footer */}
-      <div className="p-3 border-t border-[#E5DEC9] bg-[#F7F3EC]/50 m-2 rounded-xl">
+      <div className="p-3 border-t border-[var(--surface-border)] m-2 rounded-xl bg-[var(--bg-main)]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#E5DEC9] border border-[#DCD3BE] flex items-center justify-center text-[#7656A7] font-bold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] border border-[var(--surface-border)] flex items-center justify-center text-[var(--accent-primary)] font-medium text-xs shrink-0">
             AS
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-[#2B2825] truncate">
+            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
               {STUDENT_PROFILE.name}
             </p>
-            <p className="text-[11px] text-[#6E6860] font-mono tabular-nums truncate">
+            <p className="text-xs text-[var(--text-secondary)] font-mono tabular-nums truncate">
               {STUDENT_PROFILE.rollNumber}
             </p>
           </div>
