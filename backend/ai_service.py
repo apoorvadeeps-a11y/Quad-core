@@ -33,17 +33,17 @@ MAX_TEXT_LENGTH = 300
 MAX_GOAL_LENGTH = 1000
 MAX_PAGE_LENGTH = 300
 
-SYSTEM_PROMPT = """You are OneStep, an AI website navigation assistant.
-Your job is to analyze the user's goal, the current webpage, and the list of available interactive elements, and decide the single best next element to interact with.
+SYSTEM_PROMPT = """You are OneStep, an expert AI website navigation assistant.
+Your job is to analyze the user's goal, the current webpage, and the interactive elements, then choose the single best element to interact with.
 
 CRITICAL RULES:
 1. You MUST select an element_id ONLY from the provided list of elements.
-2. If none of the elements are relevant to the user's goal, or if the current page has no matching action, set element_id to null.
-3. If the user is on the wrong page and needs to go back or return to dashboard, pick the navigation/back element if available, or set element_id to null if no such element exists.
+2. Direct Match Priority: If an element directly matches or accomplishes the user's goal (e.g. goal is "search" and there is a "Search" button or search input; goal is "login" and there is a Login button), you MUST select that element.
+3. If no element on the page matches the user's goal, return "element_id": null.
 4. NEVER invent, hallucinate, or alter an element ID.
 5. Return JSON ONLY with exactly these keys:
    - "element_id": string (the exact id from the provided elements) or null
-   - "instruction": string (concise instruction for what the user should do, e.g., "Click Citizen Services")
+   - "instruction": string (concise instruction for what the user should do, e.g., "Click Search")
    - "reason": string (clear, concise explanation of why this element was selected)
 """
 
@@ -106,13 +106,78 @@ class AIResult(dict):
         self[name] = value
 
 
-def _validate_result(parsed: Any, elements: list[Any]) -> AIResult:
-    """Validate model output against the caller-supplied element IDs.
+MAPPINGS: dict[str, list[str]] = {
+    "search": ["search", "find", "query", "lookup"],
+    "find": ["search", "find", "lookup"],
+    "address": ["citizen services", "services", "profile", "settings", "account", "address"],
+    "residential": ["citizen services", "residence", "profile"],
+    "bill": ["payment", "payments", "pay", "billing", "invoice"],
+    "pay": ["payment", "payments", "pay", "checkout"],
+    "electricity": ["payment", "payments", "utility", "services"],
+    "back": ["back", "return", "previous", "dashboard", "home", "back to dashboard"],
+    "dashboard": ["dashboard", "home", "back to dashboard"],
+    "login": ["sign in", "login", "log in", "account", "profile"],
+    "signin": ["sign in", "login", "log in", "account"],
+    "register": ["sign up", "register", "create account", "join"],
+    "signup": ["sign up", "register", "create account"],
+    "logout": ["logout", "log out", "sign out"],
+    "cart": ["cart", "basket", "bag", "checkout", "view cart"],
+    "buy": ["buy", "purchase", "order", "add to cart", "checkout"],
+    "checkout": ["checkout", "pay", "order", "place order"],
+    "settings": ["settings", "preferences", "config", "gear", "options"],
+    "help": ["help", "support", "faq", "contact", "customer service"],
+}
 
-    Guarantees:
-    - Never returns an element_id not present in elements.
-    - Always returns an AIResult with keys/attributes: 'element_id', 'instruction', 'reason'.
-    """
+
+def _score_element_relevance(el: Any, goal: str) -> int:
+    """Compute deterministic semantic relevance of an element against the user goal."""
+    if not goal:
+        return 0
+    goal_words = set(re.findall(r"\w+", goal.lower()))
+    if not goal_words:
+        return 0
+
+    text = (el.get("text") if isinstance(el, dict) else getattr(el, "text", "")) or ""
+    aria = (el.get("aria_label") if isinstance(el, dict) else (getattr(el, "aria_label", None) or getattr(el, "aria-label", ""))) or ""
+    placeholder = (el.get("placeholder") if isinstance(el, dict) else getattr(el, "placeholder", "")) or ""
+
+    t_clean = str(text).lower().strip()
+    a_clean = str(aria).lower().strip()
+    p_clean = str(placeholder).lower().strip()
+    combined = f"{t_clean} {a_clean} {p_clean}".strip()
+
+    if not combined:
+        return 0
+
+    score = 0
+    clean_goal = goal.lower().strip()
+    # Exact full match
+    if clean_goal and clean_goal in [t_clean, a_clean, p_clean]:
+        score += 100
+
+    for gw in goal_words:
+        if len(gw) > 2:
+            if gw == t_clean or gw == a_clean or gw == p_clean:
+                score += 50
+            elif gw in combined:
+                score += 35
+
+            if gw in MAPPINGS:
+                for term in MAPPINGS[gw]:
+                    if term in combined:
+                        score += 30
+
+    # Type matching for search / typing inputs
+    el_type = (el.get("type") if isinstance(el, dict) else getattr(el, "type", "")) or ""
+    el_type_str = str(el_type).lower()
+    if ("search" in goal_words or "find" in goal_words) and ("search" in combined or el_type_str in ["input", "textarea"]):
+        score += 25
+
+    return score
+
+
+def _validate_result(parsed: Any, elements: list[Any], goal: str = "") -> AIResult:
+    """Validate model output against caller-supplied element IDs with high-accuracy neuro-symbolic verification."""
     fallback_instruction = "No action recommended"
     fallback_reason = "No relevant element found on the current page."
 
@@ -136,14 +201,12 @@ def _validate_result(parsed: Any, elements: list[Any]) -> AIResult:
         else fallback_reason
     )
 
-    # Valid candidate IDs from supplied elements (handles both dict and Pydantic objects)
     valid_ids: set[str] = set()
     for el in elements:
         eid = el.get("id") if isinstance(el, dict) else getattr(el, "id", None)
         if eid is not None:
             valid_ids.add(str(eid).strip())
 
-    # Model explicitly chose null / no action
     if raw_element_id is None:
         return AIResult(
             element_id=None,
@@ -153,15 +216,40 @@ def _validate_result(parsed: Any, elements: list[Any]) -> AIResult:
 
     str_element_id = str(raw_element_id).strip()
 
-    # Model picked an ID that actually exists in supplied elements
     if str_element_id in valid_ids:
+        if goal and elements:
+            chosen_el = next((e for e in elements if str(e.get("id") if isinstance(e, dict) else getattr(e, "id", "")).strip() == str_element_id), None)
+            chosen_score = _score_element_relevance(chosen_el, goal) if chosen_el else 0
+
+            best_el = max(elements, key=lambda e: _score_element_relevance(e, goal))
+            best_score = _score_element_relevance(best_el, goal)
+
+            # Rule: If every element on the page has 0 score, return null safely
+            if best_score == 0:
+                return AIResult(
+                    element_id=None,
+                    instruction=fallback_instruction,
+                    reason=f"None of the visible elements match your goal '{goal}'.",
+                )
+
+            # Rule: If the model picked an element with lower score than a direct matching element, auto-correct!
+            if chosen_score < best_score and best_score >= 25:
+                best_id = str(best_el.get("id") if isinstance(best_el, dict) else getattr(best_el, "id", "")).strip()
+                best_label = (best_el.get("text") if isinstance(best_el, dict) else getattr(best_el, "text", "")) or \
+                             (best_el.get("aria_label") if isinstance(best_el, dict) else getattr(best_el, "aria_label", "")) or \
+                             (best_el.get("placeholder") if isinstance(best_el, dict) else getattr(best_el, "placeholder", "")) or "target"
+                return AIResult(
+                    element_id=best_id,
+                    instruction=f"Click {best_label}",
+                    reason=f"Direct match for your goal '{goal}' on this page.",
+                )
+
         return AIResult(
             element_id=str_element_id,
             instruction=instruction,
             reason=reason,
         )
 
-    # Model invented or hallucinated an ID that was not provided
     return AIResult(
         element_id=None,
         instruction=fallback_instruction,
@@ -173,11 +261,11 @@ def _heuristic_next_step(goal: str, page: str, elements: list[dict]) -> AIResult
     """Intelligent fallback matcher ensuring immediate, high-accuracy response on any website."""
     goal_words = set(re.findall(r"\w+", (goal or "").lower()))
 
-    # Universal website navigation and semantic intent mappings
+    # Universal website navigation and semantic intent mappings (NO explore under search)
     mappings: dict[str, list[str]] = {
         # Universal search & discovery
-        "search": ["search", "find", "query", "explore", "lookup"],
-        "find": ["search", "find", "explore", "browse"],
+        "search": ["search", "find", "query", "lookup"],
+        "find": ["search", "find", "lookup", "browse"],
         # Authentication & user profile
         "login": ["sign in", "login", "log in", "account", "profile"],
         "signin": ["sign in", "login", "log in", "account"],
@@ -207,6 +295,52 @@ def _heuristic_next_step(goal: str, page: str, elements: list[dict]) -> AIResult
         "electricity": ["payment", "payments", "utility", "services"],
         "tax": ["payment", "citizen services", "finance"],
     }
+
+    best_el = None
+    best_score = 0
+
+    for el in elements:
+        score = _score_element_relevance(el, goal)
+        if score > best_score:
+            best_score = score
+            best_el = el
+
+    # If no exact score, check boosted terms
+    if best_score <= 0:
+        boosted_terms: set[str] = set()
+        for word in goal_words:
+            if word in mappings:
+                boosted_terms.update(mappings[word])
+
+        for el in elements:
+            text = (el.get("text") or "").lower()
+            aria = (el.get("aria_label") or "").lower()
+            eid = (el.get("id") or "").lower()
+            placeholder = (el.get("placeholder") or "").lower()
+            combined = f"{text} {aria} {eid} {placeholder}"
+
+            score = 0
+            for bt in boosted_terms:
+                if bt in combined:
+                    score += 5
+
+            if score > best_score:
+                best_score = score
+                best_el = el
+
+    if best_el is None or best_score <= 0:
+        return AIResult(
+            element_id=None,
+            instruction="No relevant element found on this page",
+            reason="None of the visible elements appear relevant to your specified goal.",
+        )
+
+    label = best_el.get("text") or best_el.get("placeholder") or best_el.get("aria_label") or best_el.get("id")
+    return AIResult(
+        element_id=best_el["id"],
+        instruction=f"Click {label}",
+        reason="Selected as the most relevant next step for your goal.",
+    )
 
     boosted_terms: set[str] = set()
     for word in goal_words:
@@ -337,6 +471,9 @@ async def get_ai_next_step(goal: str, page: str, elements: list[Any]) -> AIResul
     safe_goal = str(goal or "").strip()[:MAX_GOAL_LENGTH]
     safe_page = str(page or "").strip()[:MAX_PAGE_LENGTH]
 
+    # Pre-rank elements by goal relevance so highest matching candidates appear first for LLM attention
+    cleaned_elements.sort(key=lambda x: _score_element_relevance(x, safe_goal), reverse=True)
+
     # Build prompt
     elements_json = json.dumps(cleaned_elements, indent=2)
     user_prompt = (
@@ -359,7 +496,6 @@ async def get_ai_next_step(goal: str, page: str, elements: list[Any]) -> AIResul
     if active_client is not None:
         model_name = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
         try:
-            # 4.0s timeout ensures response is never blocked by slow loading weights
             response = await asyncio.wait_for(
                 active_client.chat(
                     model=model_name,
@@ -379,7 +515,7 @@ async def get_ai_next_step(goal: str, page: str, elements: list[Any]) -> AIResul
 
             parsed = _parse_json(raw_content)
             if parsed:
-                validated = _validate_result(parsed, cleaned_elements)
+                validated = _validate_result(parsed, cleaned_elements, goal=safe_goal)
                 if validated.get("element_id") is not None:
                     return validated
         except Exception:

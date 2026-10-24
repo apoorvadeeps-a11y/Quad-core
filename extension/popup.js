@@ -115,7 +115,8 @@ function inPageScrape() {
     '[role="option"]',
     '[tabindex="0"]',
     '[onclick]',
-    '[data-action]'
+    '[data-action]',
+    '[contenteditable="true"]'
   ];
 
   const candidates = Array.from(document.querySelectorAll(SELECTORS.join(', ')));
@@ -135,8 +136,15 @@ function inPageScrape() {
 
   for (const node of candidates) {
     if (!isVisible(node)) continue;
+
+    // Skip nested children if their parent is already an interactive button or link
+    const parentInteractive = node.parentElement?.closest('button, a[href], select, textarea, input, [role="button"], [role="link"]');
+    if (parentInteractive && candidates.includes(parentInteractive)) {
+      continue;
+    }
+
     const text = extractText(node);
-    if (!text && !node.id && node.tagName !== 'INPUT') continue;
+    if (!text && !node.id && node.tagName !== 'INPUT' && !node.isContentEditable) continue;
 
     let elId = node.id ? node.id.trim() : '';
     if (!elId || seenIds.has(elId) || elId.length > 50) {

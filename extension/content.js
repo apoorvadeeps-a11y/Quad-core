@@ -153,9 +153,15 @@ function scrapeInteractiveElements() {
   for (const node of nodes) {
     if (!isElementVisible(node)) continue;
 
+    // Skip nested children if their parent is already an interactive button or link
+    const parentInteractive = node.parentElement?.closest('button, a[href], select, textarea, input, [role="button"], [role="link"]');
+    if (parentInteractive && nodes.includes(parentInteractive)) {
+      continue;
+    }
+
     const rawText = extractElementText(node);
     // Ignore completely empty elements with no action
-    if (!rawText && !node.id && node.tagName !== 'INPUT') continue;
+    if (!rawText && !node.id && node.tagName !== 'INPUT' && !node.isContentEditable) continue;
 
     // Determine or assign stable element identifier
     let elId = node.id ? node.id.trim() : '';
